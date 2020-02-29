@@ -2,7 +2,7 @@
 
 ## How To Use
 
-```
+```shell
 export CONSUMER_KEY=XXXXXX
 export CONSUMER_SECRET=XXXXXX
 export ACCESS_TOKEN=XXXXXX
