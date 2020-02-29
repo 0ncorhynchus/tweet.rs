@@ -1,6 +1,7 @@
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use reqwest::header;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::time::{SystemTime, SystemTimeError};
 use url::form_urlencoded::byte_serialize;
@@ -40,20 +41,27 @@ fn gen_signature(key: String, url: &str, params: &str) -> String {
     )))
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let consumer_key = "XXXXXX";
-    let consumer_secret = "XXXXXX";
-    let access_token = "XXXXXX";
-    let access_token_secret = "XXXXXX";
+#[derive(Debug, Deserialize)]
+struct Config {
+    consumer_key: String,
+    consumer_secret: String,
+    access_token: String,
+    access_token_secret: String,
+}
 
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = envy::from_env::<Config>()?;
     let status = urlencode("hoge"); // Tweet contents
 
     let timestamp = urlencode(&get_timestamp()?);
     let nonce = urlencode(&gen_nonce());
 
     let mut params: HashMap<String, String> = vec![
-        ("oauth_consumer_key".to_string(), consumer_key.to_string()),
-        ("oauth_token".to_string(), access_token.to_string()),
+        (
+            "oauth_consumer_key".to_string(),
+            config.consumer_key.clone(),
+        ),
+        ("oauth_token".to_string(), config.access_token.clone()),
         (
             "oauth_signature_method".to_string(),
             "HMAC-SHA1".to_string(),
@@ -75,8 +83,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let signature_key = format!(
         "{}&{}",
-        urlencode(consumer_secret),
-        urlencode(access_token_secret)
+        urlencode(&config.consumer_secret),
+        urlencode(&config.access_token_secret)
     );
     let signature = gen_signature(signature_key, UPDATE_URL, &params_str);
 
