@@ -1,10 +1,10 @@
+use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use reqwest::header;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::time::{SystemTime, SystemTimeError};
-use url::form_urlencoded::byte_serialize;
 use url::Url;
 
 const UPDATE_URL: &'static str = "https://api.twitter.com/1.1/statuses/update.json";
@@ -24,18 +24,23 @@ fn gen_nonce() -> String {
         .collect()
 }
 
-fn urlencode(input: &str) -> String {
-    byte_serialize(input.as_bytes()).collect()
+fn percent_encode(input: &str) -> String {
+    const FRAGMENTS: &AsciiSet = &NON_ALPHANUMERIC
+        .remove(b'-')
+        .remove(b'.')
+        .remove(b'_')
+        .remove(b'~');
+    utf8_percent_encode(input, FRAGMENTS).to_string()
 }
 
 fn gen_signature(key: String, url: &str, params: &str) -> String {
     let signature_data = format!(
         "{}&{}&{}",
-        urlencode("POST"),
-        urlencode(url),
-        urlencode(params)
+        percent_encode("POST"),
+        percent_encode(url),
+        percent_encode(params)
     );
-    urlencode(&base64::encode(&hmacsha1::hmac_sha1(
+    percent_encode(&base64::encode(&hmacsha1::hmac_sha1(
         key.as_bytes(),
         signature_data.as_bytes(),
     )))
@@ -53,8 +58,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = envy::from_env::<Config>()?;
     let status = std::env::args().skip(1).collect::<Vec<_>>().join(" ");
 
-    let timestamp = urlencode(&get_timestamp()?);
-    let nonce = urlencode(&gen_nonce());
+    let timestamp = percent_encode(&get_timestamp()?);
+    let nonce = percent_encode(&gen_nonce());
 
     let mut params: HashMap<String, String> = vec![
         (
@@ -77,14 +82,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .iter()
         .map(|(k, v)| format!("{}={}", k, v))
         .collect::<Vec<_>>();
-    params_str.push(format!("status={}", status));
+    params_str.push(format!("status={}", percent_encode(&status)));
     params_str.sort();
     let params_str = &params_str.join("&");
 
     let signature_key = format!(
         "{}&{}",
-        urlencode(&config.consumer_secret),
-        urlencode(&config.access_token_secret)
+        percent_encode(&config.consumer_secret),
+        percent_encode(&config.access_token_secret)
     );
     let signature = gen_signature(signature_key, UPDATE_URL, &params_str);
 
@@ -102,8 +107,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let url = Url::parse_with_params(UPDATE_URL, &[("status", status)])?;
 
-    // println!("curl -XPOST --url '{}' --header 'authorization: {}'", url, header_value);
-
     let client = reqwest::blocking::Client::builder()
         .default_headers(headers)
         .build()?;
@@ -111,4 +114,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("response: {:?}", res);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_percent_encode() {
+        assert_eq!(
+            percent_encode("Ladies + Gentlemen"),
+            "Ladies%20%2B%20Gentlemen"
+        );
+        assert_eq!(
+            percent_encode("An encoded string!"),
+            "An%20encoded%20string%21"
+        );
+        assert_eq!(
+            percent_encode("Dogs, Cats & Mice"),
+            "Dogs%2C%20Cats%20%26%20Mice"
+        );
+        assert_eq!(percent_encode("☃"), "%E2%98%83");
+    }
 }

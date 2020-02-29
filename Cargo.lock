@@ -878,6 +878,7 @@ dependencies = [
  "base64",
  "envy",
  "hmac-sha1",
+ "percent-encoding",
  "rand",
  "reqwest",
  "serde",
