@@ -51,7 +51,7 @@ struct Config {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = envy::from_env::<Config>()?;
-    let status = urlencode("hoge"); // Tweet contents
+    let status = std::env::args().skip(1).collect::<Vec<_>>().join(" ");
 
     let timestamp = urlencode(&get_timestamp()?);
     let nonce = urlencode(&gen_nonce());
