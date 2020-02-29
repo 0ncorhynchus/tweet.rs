@@ -111,7 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .default_headers(headers)
         .build()?;
     let res = client.post(url).send()?;
-    println!("response: {:?}", res);
+    res.error_for_status()?;
 
     Ok(())
 }
